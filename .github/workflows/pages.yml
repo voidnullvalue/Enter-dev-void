@@ -26,6 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Rebuild from post metadata on every run; post links are never hard-coded here.
       - name: Build index from post metadata
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
