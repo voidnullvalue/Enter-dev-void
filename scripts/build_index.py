@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import base64
 import html
 import json
 import os
@@ -8,7 +7,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -16,8 +17,12 @@ OWNER = os.environ.get("DEVVOID_OWNER", "voidnullvalue")
 TEMPLATE = Path("index.template.html")
 OUTPUT_DIR = Path("_site")
 POSTS_JSON = OUTPUT_DIR / "posts.json"
+FEED_XML = OUTPUT_DIR / "feed.xml"
 MARKER = "<!-- DEVVOID_POSTS -->"
 USER_AGENT = "Enter-dev-void-indexer/1"
+SITE_URL = "https://voidnullvalue.github.io/Enter-dev-void/"
+FEED_URL = SITE_URL + "feed.xml"
+ATOM_NS = "http://www.w3.org/2005/Atom"
 
 
 class DevVoidMetaParser(HTMLParser):
@@ -80,6 +85,12 @@ def parse_published(value):
     if normalized.endswith("Z"):
         normalized = normalized[:-1] + "+00:00"
     return datetime.fromisoformat(normalized)
+
+
+def rss_datetime(value):
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return format_datetime(value)
 
 
 def discover_posts(owner, token=None):
@@ -160,6 +171,45 @@ def render_posts(posts):
     return "\n".join(rendered)
 
 
+def build_rss(posts):
+    ET.register_namespace("atom", ATOM_NS)
+    rss = ET.Element("rss", {"version": "2.0"})
+    channel = ET.SubElement(rss, "channel")
+
+    ET.SubElement(channel, "title").text = "Enter /dev/void/"
+    ET.SubElement(channel, "link").text = SITE_URL
+    ET.SubElement(channel, "description").text = (
+        "Old hardware, embedded Linux, reverse engineering, local services, "
+        "and other things I decided to screw with."
+    )
+    ET.SubElement(channel, "language").text = "en-us"
+    ET.SubElement(channel, "generator").text = "Enter /dev/void/ metadata indexer"
+    ET.SubElement(channel, "ttl").text = "60"
+    ET.SubElement(channel, f"{{{ATOM_NS}}}link", {
+        "href": FEED_URL,
+        "rel": "self",
+        "type": "application/rss+xml",
+    })
+
+    if posts:
+        ET.SubElement(channel, "lastBuildDate").text = rss_datetime(posts[0]["published_dt"])
+
+    for post in posts:
+        item = ET.SubElement(channel, "item")
+        ET.SubElement(item, "title").text = post["title"]
+        ET.SubElement(item, "link").text = post["url"]
+        guid = ET.SubElement(item, "guid", {"isPermaLink": "true"})
+        guid.text = post["url"]
+        ET.SubElement(item, "pubDate").text = rss_datetime(post["published_dt"])
+        ET.SubElement(item, "description").text = post["summary"]
+        for tag in post["tags"]:
+            ET.SubElement(item, "category").text = tag
+
+    tree = ET.ElementTree(rss)
+    ET.indent(tree, space="  ")
+    return ET.tostring(rss, encoding="utf-8", xml_declaration=True)
+
+
 def main():
     token = os.environ.get("GITHUB_TOKEN")
     posts = discover_posts(OWNER, token=token)
@@ -172,6 +222,7 @@ def main():
     output = template.replace(MARKER, render_posts(posts))
     (OUTPUT_DIR / "index.html").write_text(output, encoding="utf-8")
     (OUTPUT_DIR / ".nojekyll").write_text("", encoding="utf-8")
+    FEED_XML.write_bytes(build_rss(posts))
 
     serializable = [
         {key: value for key, value in post.items() if key != "published_dt"}
@@ -182,6 +233,7 @@ def main():
     print(f"Indexed {len(posts)} post(s):")
     for post in posts:
         print(f"  {post['published']}  {post['repo']}  {post['title']}")
+    print(f"RSS: {FEED_URL}")
 
 
 if __name__ == "__main__":
