@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enter /dev/void/</title>
+  <meta name="description" content="Old hardware, embedded Linux, reverse engineering, local services, and other things I decided to screw with.">
+  <meta name="theme-color" content="#0a0c0b">
+  <meta property="og:title" content="Enter /dev/void/">
+  <meta property="og:description" content="Old hardware, embedded Linux, reverse engineering, local services, and other things I decided to screw with.">
+  <meta property="og:type" content="website">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c0b;
+      --panel: #0f1210;
+      --text: #d9e0d8;
+      --muted: #7f8c80;
+      --dim: #566057;
+      --accent: #9be564;
+      --accent-2: #f0a35e;
+      --line: #232a24;
+      --code: #c7d6c7;
+      --max: 780px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      background: var(--bg);
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover { color: #c4ff9d; }
+
+    .wrap {
+      width: min(calc(100% - 32px), var(--max));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 44px 0 30px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .prompt {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .prompt .host { color: var(--accent); }
+    .prompt .path { color: var(--accent-2); }
+
+    h1, h2 {
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 18ch;
+      font-size: clamp(2rem, 7vw, 3.6rem);
+      font-weight: 700;
+      color: #eef5ed;
+    }
+
+    .dek {
+      margin: 22px 0 0;
+      max-width: 65ch;
+      color: var(--muted);
+      font-size: 1.03rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 22px;
+      color: var(--dim);
+      font-size: 13px;
+    }
+
+    main {
+      padding: 32px 0 64px;
+    }
+
+    h2 {
+      margin: 3.2rem 0 1rem;
+      font-size: 1.35rem;
+      color: #e7eee6;
+    }
+
+    h2::before {
+      content: "## ";
+      color: var(--accent);
+    }
+
+    p { margin: 1rem 0; }
+
+    .lede {
+      font-size: 1.08rem;
+      color: #e4eae3;
+    }
+
+    .posts {
+      margin-top: 2.3rem;
+      border-top: 1px solid var(--line);
+    }
+
+    article {
+      padding: 1.55rem 0 1.7rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .post-date {
+      color: var(--accent-2);
+      font-size: 13px;
+    }
+
+    .post-title {
+      margin: 0.35rem 0 0.5rem;
+      font-size: 1.25rem;
+      line-height: 1.35;
+    }
+
+    .post-title a {
+      color: #eef5ed;
+      text-decoration: none;
+    }
+
+    .post-title a::before {
+      content: "./";
+      color: var(--accent);
+    }
+
+    .post-title a:hover { color: #c4ff9d; }
+
+    .post-summary {
+      margin: 0.4rem 0 0;
+      color: var(--muted);
+    }
+
+    .post-tags {
+      margin-top: 0.65rem;
+      color: var(--dim);
+      font-size: 13px;
+    }
+
+    .tag::before { content: "#"; color: var(--accent); }
+    .tag + .tag { margin-left: 0.8rem; }
+
+    footer {
+      padding: 24px 0 48px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.65ch;
+      height: 1.05em;
+      margin-left: 0.2ch;
+      vertical-align: -0.14em;
+      background: var(--accent);
+      animation: blink 1.15s steps(1, end) infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursor { animation: none; }
+      html { scroll-behavior: auto; }
+    }
+
+    @media (max-width: 560px) {
+      body { font-size: 15px; }
+      header { padding-top: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="prompt"><span class="host">void@localhost</span>:<span class="path">~/Enter-dev-void</span>$ ls -lt posts/</p>
+      <h1>Enter /dev/void/<span class="cursor" aria-hidden="true"></span></h1>
+      <p class="dek">Old hardware, embedded Linux, reverse engineering, local services, and other things I decided to screw with.</p>
+      <div class="meta">
+        <span>voidnullvalue</span>
+        <span>newest first</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="lede">I use Linux, I like old hardware, and I keep taking vendor appliances apart until they do something more useful. This is where I write up the reverse engineering, embedded crap, local services, networking, and whatever else I got distracted by.</p>
+
+    <h2>Posts</h2>
+    <div class="posts">
+<!-- DEVVOID_POSTS -->
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>void@localhost:~/Enter-dev-void$ </span><span class="cursor" aria-hidden="true"></span>
+    </div>
+  </footer>
+</body>
+</html>
