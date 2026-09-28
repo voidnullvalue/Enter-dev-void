@@ -34,4 +34,4 @@ If a page uses a custom domain or some other URL, add:
 <meta name="devvoid:url" content="https://example.com/post/">
 ```
 
-The index rebuilds on pushes to this repo, on manual dispatch, and on an hourly schedule, so adding the metadata to another public Pages repo is enough to make it show up here without editing this repo.
+The index rebuilds on pushes to this repo, on manual dispatch, and every 15 minutes, so adding the metadata to another public Pages repo is enough to make it show up here without editing this repo.
