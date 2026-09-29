@@ -3,7 +3,11 @@
 import html
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,10 +23,14 @@ OUTPUT_DIR = Path("_site")
 POSTS_JSON = OUTPUT_DIR / "posts.json"
 FEED_XML = OUTPUT_DIR / "feed.xml"
 MARKER = "<!-- DEVVOID_POSTS -->"
-USER_AGENT = "Enter-dev-void-indexer/1"
-SITE_URL = "https://voidnullvalue.github.io/Enter-dev-void/"
+USER_AGENT = "Enter-dev-void-indexer/2"
+SITE_URL = "https://devslashvoid.dev/"
 FEED_URL = SITE_URL + "feed.xml"
 ATOM_NS = "http://www.w3.org/2005/Atom"
+OLD_INDEX_URLS = (
+    "https://voidnullvalue.github.io/Enter-dev-void/",
+    "https://voidnullvalue.github.io/Enter-dev-void",
+)
 
 
 class DevVoidMetaParser(HTMLParser):
@@ -98,6 +106,7 @@ def discover_posts(owner, token=None):
     for repo in list_public_repos(owner, token=token):
         if repo.get("fork") or repo.get("archived"):
             continue
+
         name = repo["name"]
         branch = repo.get("default_branch") or "main"
         try:
@@ -105,6 +114,7 @@ def discover_posts(owner, token=None):
         except Exception as exc:
             print(f"WARN: {name}: could not fetch index.html: {exc}", file=sys.stderr)
             continue
+
         if not source:
             continue
 
@@ -130,22 +140,113 @@ def discover_posts(owner, token=None):
             print(f"WARN: {name}: invalid devvoid:published={meta['published']!r}", file=sys.stderr)
             continue
 
-        default_url = f"https://{owner}.github.io/{urllib.parse.quote(name)}/"
+        source_url = (
+            meta.get("url")
+            or f"https://{owner}.github.io/{urllib.parse.quote(name)}/"
+        )
+        local_url = SITE_URL + "posts/" + urllib.parse.quote(name) + "/"
         tags = [tag.strip() for tag in meta.get("tags", "").split(",") if tag.strip()]
+
         posts.append(
             {
                 "repo": name,
+                "branch": branch,
                 "title": meta["title"],
                 "summary": meta["summary"],
                 "published": meta["published"],
                 "published_dt": published,
-                "url": meta.get("url") or default_url,
+                "url": local_url,
+                "source_url": source_url,
                 "tags": tags,
+                "source_html": source,
             }
         )
 
     posts.sort(key=lambda post: post["published_dt"], reverse=True)
     return posts
+
+
+def rewrite_mirrored_index(path, post):
+    source = path.read_text(encoding="utf-8", errors="replace")
+    local_url = post["url"]
+
+    # Keep old post repos independently publishable, but make the mirrored copy
+    # identify itself as the devslashvoid.dev version.
+    source = re.sub(
+        r'(<meta\s+name=["\']devvoid:url["\']\s+content=["\'])[^"\']*(["\'])',
+        lambda match: match.group(1) + local_url + match.group(2),
+        source,
+        flags=re.IGNORECASE,
+    )
+
+    # Rewrite explicit self-links and old blog-index links in mirrored copies.
+    source_url = post.get("source_url")
+    if source_url:
+        source = source.replace(source_url, local_url)
+
+    for old_url in OLD_INDEX_URLS:
+        source = source.replace(old_url, SITE_URL)
+
+    # Give search engines a stable canonical URL on the custom domain.
+    if re.search(r'<link\b[^>]*\brel=["\']canonical["\']', source, flags=re.IGNORECASE):
+        source = re.sub(
+            r'<link\b[^>]*\brel=["\']canonical["\'][^>]*>',
+            f'<link rel="canonical" href="{html.escape(local_url, quote=True)}">',
+            source,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    else:
+        canonical = f'  <link rel="canonical" href="{html.escape(local_url, quote=True)}">\n'
+        source = re.sub(r"</head>", canonical + "</head>", source, count=1, flags=re.IGNORECASE)
+
+    path.write_text(source, encoding="utf-8")
+
+
+def mirror_post(post):
+    destination = OUTPUT_DIR / "posts" / post["repo"]
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    repo_url = f"https://github.com/{OWNER}/{post['repo']}.git"
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="devvoid-post-") as tmpdir:
+            checkout = Path(tmpdir) / "repo"
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--quiet",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    post["branch"],
+                    repo_url,
+                    str(checkout),
+                ],
+                check=True,
+                timeout=60,
+            )
+
+            shutil.copytree(
+                checkout,
+                destination,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(".git", ".github"),
+            )
+    except Exception as exc:
+        print(
+            f"WARN: {post['repo']}: full mirror failed ({exc}); copying index.html only",
+            file=sys.stderr,
+        )
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / "index.html").write_text(post["source_html"], encoding="utf-8")
+
+    index = destination / "index.html"
+    if not index.exists():
+        raise RuntimeError(f"{post['repo']}: mirrored repository has no index.html")
+
+    rewrite_mirrored_index(index, post)
 
 
 def render_posts(posts):
@@ -185,11 +286,15 @@ def build_rss(posts):
     ET.SubElement(channel, "language").text = "en-us"
     ET.SubElement(channel, "generator").text = "Enter /dev/void/ metadata indexer"
     ET.SubElement(channel, "ttl").text = "60"
-    ET.SubElement(channel, f"{{{ATOM_NS}}}link", {
-        "href": FEED_URL,
-        "rel": "self",
-        "type": "application/rss+xml",
-    })
+    ET.SubElement(
+        channel,
+        f"{{{ATOM_NS}}}link",
+        {
+            "href": FEED_URL,
+            "rel": "self",
+            "type": "application/rss+xml",
+        },
+    )
 
     if posts:
         ET.SubElement(channel, "lastBuildDate").text = rss_datetime(posts[0]["published_dt"])
@@ -218,14 +323,27 @@ def main():
     if MARKER not in template:
         raise SystemExit(f"template is missing {MARKER}")
 
+    if OUTPUT_DIR.exists():
+        shutil.rmtree(OUTPUT_DIR)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    for post in posts:
+        try:
+            mirror_post(post)
+        except Exception as exc:
+            print(f"WARN: {post['repo']}: mirror failed: {exc}", file=sys.stderr)
+
     output = template.replace(MARKER, render_posts(posts))
     (OUTPUT_DIR / "index.html").write_text(output, encoding="utf-8")
     (OUTPUT_DIR / ".nojekyll").write_text("", encoding="utf-8")
     FEED_XML.write_bytes(build_rss(posts))
 
     serializable = [
-        {key: value for key, value in post.items() if key != "published_dt"}
+        {
+            key: value
+            for key, value in post.items()
+            if key not in {"published_dt", "source_html"}
+        }
         for post in posts
     ]
     POSTS_JSON.write_text(json.dumps(serializable, indent=2) + "\n", encoding="utf-8")
@@ -233,6 +351,8 @@ def main():
     print(f"Indexed {len(posts)} post(s):")
     for post in posts:
         print(f"  {post['published']}  {post['repo']}  {post['title']}")
+        print(f"    local:  {post['url']}")
+        print(f"    source: {post['source_url']}")
     print(f"RSS: {FEED_URL}")
 
 
