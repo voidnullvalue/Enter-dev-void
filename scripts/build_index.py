@@ -23,7 +23,7 @@ OUTPUT_DIR = Path("_site")
 POSTS_JSON = OUTPUT_DIR / "posts.json"
 FEED_XML = OUTPUT_DIR / "feed.xml"
 MARKER = "<!-- DEVVOID_POSTS -->"
-USER_AGENT = "Enter-dev-void-indexer/2"
+USER_AGENT = "Enter-dev-void-indexer/3"
 SITE_URL = "https://devslashvoid.dev/"
 FEED_URL = SITE_URL + "feed.xml"
 ATOM_NS = "http://www.w3.org/2005/Atom"
@@ -76,16 +76,67 @@ def list_public_repos(owner, token=None):
     return repos
 
 
-def fetch_root_index(owner, repo_name, default_branch):
-    repo = urllib.parse.quote(repo_name, safe="")
-    branch = urllib.parse.quote(default_branch, safe="")
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/index.html"
+def quote_path(path):
+    return "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+
+
+def fetch_repo_index_paths(owner, repo_name, default_branch, token=None):
+    owner_q = urllib.parse.quote(owner, safe="")
+    repo_q = urllib.parse.quote(repo_name, safe="")
+    branch_q = urllib.parse.quote(default_branch, safe="")
+    url = (
+        f"https://api.github.com/repos/{owner_q}/{repo_q}"
+        f"/git/trees/{branch_q}?recursive=1"
+    )
+    payload = json.loads(request_text(url, token=token))
+
+    paths = []
+    for entry in payload.get("tree", []):
+        if entry.get("type") != "blob":
+            continue
+        path = entry.get("path", "")
+        if path == "index.html" or (
+            path.startswith("posts/") and path.endswith("/index.html")
+        ):
+            paths.append(path)
+
+    return sorted(paths)
+
+
+def fetch_index(owner, repo_name, default_branch, path):
+    owner_q = urllib.parse.quote(owner, safe="")
+    repo_q = urllib.parse.quote(repo_name, safe="")
+    branch_q = urllib.parse.quote(default_branch, safe="")
+    url = (
+        f"https://raw.githubusercontent.com/{owner_q}/{repo_q}/{branch_q}/"
+        f"{quote_path(path)}"
+    )
     try:
         return request_text(url)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             return None
         raise
+
+
+def post_slug(repo_name, source_path):
+    if source_path == "index.html":
+        return repo_name
+
+    prefix = "posts/"
+    suffix = "/index.html"
+    slug = source_path[len(prefix):-len(suffix)].strip("/")
+    if not slug or any(part in {"", ".", ".."} for part in slug.split("/")):
+        raise ValueError(f"invalid post path: {source_path!r}")
+    return slug
+
+
+def default_source_url(owner, repo_name, source_path):
+    base = f"https://{owner}.github.io/{urllib.parse.quote(repo_name, safe='')}/"
+    if source_path == "index.html":
+        return base
+    parent = source_path.rsplit("/", 1)[0]
+    return base + quote_path(parent) + "/"
 
 
 def parse_published(value):
@@ -103,64 +154,112 @@ def rss_datetime(value):
 
 def discover_posts(owner, token=None):
     posts = []
+    claimed_urls = {}
+
     for repo in list_public_repos(owner, token=token):
         if repo.get("fork") or repo.get("archived"):
             continue
 
         name = repo["name"]
         branch = repo.get("default_branch") or "main"
+
         try:
-            source = fetch_root_index(owner, name, branch)
+            index_paths = fetch_repo_index_paths(
+                owner, name, branch, token=token
+            )
         except Exception as exc:
-            print(f"WARN: {name}: could not fetch index.html: {exc}", file=sys.stderr)
+            print(
+                f"WARN: {name}: could not enumerate index.html files: {exc}",
+                file=sys.stderr,
+            )
             continue
 
-        if not source:
-            continue
+        for source_path in index_paths:
+            try:
+                source = fetch_index(owner, name, branch, source_path)
+            except Exception as exc:
+                print(
+                    f"WARN: {name}:{source_path}: could not fetch file: {exc}",
+                    file=sys.stderr,
+                )
+                continue
 
-        parser = DevVoidMetaParser()
-        try:
-            parser.feed(source)
-        except Exception as exc:
-            print(f"WARN: {name}: could not parse HTML: {exc}", file=sys.stderr)
-            continue
+            if not source:
+                continue
 
-        meta = parser.meta
-        if meta.get("post", "").lower() not in {"1", "true", "yes"}:
-            continue
+            parser = DevVoidMetaParser()
+            try:
+                parser.feed(source)
+            except Exception as exc:
+                print(
+                    f"WARN: {name}:{source_path}: could not parse HTML: {exc}",
+                    file=sys.stderr,
+                )
+                continue
 
-        missing = [key for key in ("title", "summary", "published") if not meta.get(key)]
-        if missing:
-            print(f"WARN: {name}: devvoid post missing {', '.join(missing)}", file=sys.stderr)
-            continue
+            meta = parser.meta
+            if meta.get("post", "").lower() not in {"1", "true", "yes"}:
+                continue
 
-        try:
-            published = parse_published(meta["published"])
-        except ValueError:
-            print(f"WARN: {name}: invalid devvoid:published={meta['published']!r}", file=sys.stderr)
-            continue
+            missing = [
+                key
+                for key in ("title", "summary", "published")
+                if not meta.get(key)
+            ]
+            if missing:
+                print(
+                    f"WARN: {name}:{source_path}: devvoid post missing "
+                    f"{', '.join(missing)}",
+                    file=sys.stderr,
+                )
+                continue
 
-        source_url = (
-            meta.get("url")
-            or f"https://{owner}.github.io/{urllib.parse.quote(name)}/"
-        )
-        local_url = SITE_URL + "posts/" + urllib.parse.quote(name) + "/"
-        tags = [tag.strip() for tag in meta.get("tags", "").split(",") if tag.strip()]
+            try:
+                published = parse_published(meta["published"])
+                slug = post_slug(name, source_path)
+            except ValueError as exc:
+                print(
+                    f"WARN: {name}:{source_path}: {exc}",
+                    file=sys.stderr,
+                )
+                continue
 
-        posts.append(
-            {
-                "repo": name,
-                "branch": branch,
-                "title": meta["title"],
-                "summary": meta["summary"],
-                "published": meta["published"],
-                "published_dt": published,
-                "url": local_url,
-                "source_url": source_url,
-                "tags": tags,
-                "source_html": source,
-            }
-        )
+            local_url = SITE_URL + "posts/" + quote_path(slug) + "/"
+            if local_url in claimed_urls:
+                print(
+                    f"WARN: {name}:{source_path}: URL collision with "
+                    f"{claimed_urls[local_url]} at {local_url}; skipping",
+                    file=sys.stderr,
+                )
+                continue
+            claimed_urls[local_url] = f"{name}:{source_path}"
+
+            source_url = (
+                meta.get("url")
+                or default_source_url(owner, name, source_path)
+            )
+            tags = [
+                tag.strip()
+                for tag in meta.get("tags", "").split(",")
+                if tag.strip()
+            ]
+
+            posts.append(
+                {
+                    "repo": name,
+                    "branch": branch,
+                    "source_path": source_path,
+                    "slug": slug,
+                    "title": meta["title"],
+                    "summary": meta["summary"],
+                    "published": meta["published"],
+                    "published_dt": published,
+                    "url": local_url,
+                    "source_url": source_url,
+                    "tags": tags,
+                    "source_html": source,
+                }
+            )
 
     posts.sort(key=lambda post: post["published_dt"], reverse=True)
     return posts
@@ -204,10 +303,13 @@ def rewrite_mirrored_index(path, post):
 
 
 def mirror_post(post):
-    destination = OUTPUT_DIR / "posts" / post["repo"]
+    destination = OUTPUT_DIR / "posts"
+    for part in post["slug"].split("/"):
+        destination /= part
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     repo_url = f"https://github.com/{OWNER}/{post['repo']}.git"
+    label = f"{post['repo']}:{post['source_path']}"
 
     try:
         with tempfile.TemporaryDirectory(prefix="devvoid-post-") as tmpdir:
@@ -228,23 +330,37 @@ def mirror_post(post):
                 timeout=60,
             )
 
+            if post["source_path"] == "index.html":
+                source_dir = checkout
+            else:
+                source_dir = checkout.joinpath(
+                    *post["source_path"].split("/")[:-1]
+                )
+
+            if not source_dir.is_dir():
+                raise RuntimeError(
+                    f"{label}: source directory not found after clone"
+                )
+
             shutil.copytree(
-                checkout,
+                source_dir,
                 destination,
                 dirs_exist_ok=True,
                 ignore=shutil.ignore_patterns(".git", ".github"),
             )
     except Exception as exc:
         print(
-            f"WARN: {post['repo']}: full mirror failed ({exc}); copying index.html only",
+            f"WARN: {label}: full mirror failed ({exc}); copying index.html only",
             file=sys.stderr,
         )
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / "index.html").write_text(post["source_html"], encoding="utf-8")
+        (destination / "index.html").write_text(
+            post["source_html"], encoding="utf-8"
+        )
 
     index = destination / "index.html"
     if not index.exists():
-        raise RuntimeError(f"{post['repo']}: mirrored repository has no index.html")
+        raise RuntimeError(f"{label}: mirrored post has no index.html")
 
     rewrite_mirrored_index(index, post)
 
@@ -331,7 +447,10 @@ def main():
         try:
             mirror_post(post)
         except Exception as exc:
-            print(f"WARN: {post['repo']}: mirror failed: {exc}", file=sys.stderr)
+            print(
+                f"WARN: {post['repo']}:{post['source_path']}: mirror failed: {exc}",
+                file=sys.stderr,
+            )
 
     output = template.replace(MARKER, render_posts(posts))
     (OUTPUT_DIR / "index.html").write_text(output, encoding="utf-8")
@@ -350,7 +469,10 @@ def main():
 
     print(f"Indexed {len(posts)} post(s):")
     for post in posts:
-        print(f"  {post['published']}  {post['repo']}  {post['title']}")
+        print(
+            f"  {post['published']}  {post['repo']}:{post['source_path']}  "
+            f"{post['title']}"
+        )
         print(f"    local:  {post['url']}")
         print(f"    source: {post['source_url']}")
     print(f"RSS: {FEED_URL}")
