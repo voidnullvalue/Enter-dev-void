@@ -23,8 +23,6 @@ OUTPUT_DIR = Path("_site")
 POSTS_JSON = OUTPUT_DIR / "posts.json"
 FEED_XML = OUTPUT_DIR / "feed.xml"
 MARKER = "<!-- DEVVOID_POSTS -->"
-COUNTER_MARKER = "<!-- DEVVOID_COUNTER -->"
-GOATCOUNTER_CODE = os.environ.get("DEVVOID_GOATCOUNTER_CODE", "devslashvoid")
 USER_AGENT = "Enter-dev-void-indexer/3"
 SITE_URL = "https://devslashvoid.dev/"
 FEED_URL = SITE_URL + "feed.xml"
@@ -268,56 +266,6 @@ def discover_posts(owner, token=None):
 
 
 
-def goatcounter_markup(display_path):
-    code = GOATCOUNTER_CODE.strip()
-    if not code:
-        return ""
-
-    endpoint = f"https://{code}.goatcounter.com"
-    safe_endpoint = html.escape(endpoint, quote=True)
-    safe_display_path = html.escape(display_path)
-    return f"""
-      <div class="devvoid-counter" data-devvoid-counter hidden>
-        <span data-devvoid-count></span> poor bastards have wandered into <span class="devvoid-route">{safe_display_path}</span>
-      </div>
-      <script>
-        window.goatcounter = {{
-          path: function() {{
-            return location.pathname || "/";
-          }}
-        }};
-      </script>
-      <script data-goatcounter="{safe_endpoint}/count" async src="//gc.zgo.at/count.js"></script>
-      <script>
-        (function() {{
-          var counter = document.querySelector("[data-devvoid-counter]");
-          if (!counter) return;
-
-          var path = location.pathname || "/";
-          var url = "{safe_endpoint}/counter/" + encodeURIComponent(path) + ".json";
-
-          function showCount(attempt) {{
-            fetch(url)
-              .then(function(response) {{
-                if (!response.ok) throw new Error("counter unavailable");
-                return response.json();
-              }})
-              .then(function(data) {{
-                counter.querySelector("[data-devvoid-count]").textContent = data.count;
-                counter.hidden = false;
-              }})
-              .catch(function() {{
-                if (attempt < 2) {{
-                  setTimeout(function() {{ showCount(attempt + 1); }}, 1200);
-                }}
-              }});
-          }}
-
-          showCount(0);
-        }})();
-      </script>"""
-
-
 def rewrite_mirrored_index(path, post):
     source = path.read_text(encoding="utf-8", errors="replace")
     local_url = post["url"]
@@ -351,24 +299,6 @@ def rewrite_mirrored_index(path, post):
     else:
         canonical = f'  <link rel="canonical" href="{html.escape(local_url, quote=True)}">\n'
         source = re.sub(r"</head>", canonical + "</head>", source, count=1, flags=re.IGNORECASE)
-
-    counter_markup = goatcounter_markup(f"/dev/void/{post['slug']}")
-    if re.search(r"</footer>", source, flags=re.IGNORECASE):
-        source = re.sub(
-            r"</footer>",
-            counter_markup + "\n  </footer>",
-            source,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-    else:
-        source = re.sub(
-            r"</body>",
-            counter_markup + "\n</body>",
-            source,
-            count=1,
-            flags=re.IGNORECASE,
-        )
 
     path.write_text(source, encoding="utf-8")
 
@@ -509,8 +439,6 @@ def main():
     template = TEMPLATE.read_text(encoding="utf-8")
     if MARKER not in template:
         raise SystemExit(f"template is missing {MARKER}")
-    if COUNTER_MARKER not in template:
-        raise SystemExit(f"template is missing {COUNTER_MARKER}")
 
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
@@ -526,7 +454,6 @@ def main():
             )
 
     output = template.replace(MARKER, render_posts(posts))
-    output = output.replace(COUNTER_MARKER, goatcounter_markup("/dev/void/"))
     (OUTPUT_DIR / "index.html").write_text(output, encoding="utf-8")
     (OUTPUT_DIR / ".nojekyll").write_text("", encoding="utf-8")
     FEED_XML.write_bytes(build_rss(posts))
