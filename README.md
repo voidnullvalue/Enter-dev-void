@@ -127,26 +127,3 @@ The mirror excludes `.git` and `.github`. If cloning a source repository fails, 
 
 Private repositories are not currently discovered or mirrored.
 
-
-## Per-page visitor counter
-
-The generated site includes GoatCounter pageview tracking and a per-page visible counter.
-
-By default the GoatCounter site code is `devslashvoid`, so the generated endpoint is:
-
-```text
-https://devslashvoid.goatcounter.com/count
-```
-
-Override it at build time with `DEVVOID_GOATCOUNTER_CODE` if the GoatCounter site uses a different code.
-
-The visible footer uses the blog's pseudo-path rather than the public URL:
-
-```text
-1,847 poor bastards have wandered into /dev/void/
-1,847 poor bastards have wandered into /dev/void/some-post
-```
-
-Counts remain keyed to the actual published page path, such as `/` or `/posts/some-post/`, so each page has its own count.
-
-In GoatCounter, enable **Allow adding visitor counts on your website** or the visible counter endpoint will not return the count.
