@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatGPT's GitHub connector spazzed out and GitHub suspended me</title>
+  <meta name="description" content="ChatGPT's GitHub connector was active, GitHub suspended my account, revoked the connector OAuth tokens, and several FOSS repos went 404 for a while. OpenAI support was somehow the least painful part.">
+  <meta name="theme-color" content="#0a0c0b">
+  <meta property="og:title" content="ChatGPT's GitHub connector spazzed out and GitHub suspended me">
+  <meta property="og:description" content="GitHub suspended my account during a ChatGPT connector session, revoked the connector tokens, and several FOSS projects disappeared for a while.">
+  <meta property="og:type" content="article">
+  <meta name="devvoid:post" content="1">
+  <meta name="devvoid:title" content="ChatGPT's GitHub connector spazzed out and GitHub suspended me">
+  <meta name="devvoid:summary" content="GitHub suspended my account during a ChatGPT connector session, revoked the connector OAuth tokens, and several FOSS projects went 404. OpenAI support was weirdly the part that worked.">
+  <meta name="devvoid:published" content="2026-10-02T04:43:00Z">
+  <meta name="devvoid:tags" content="github, openai, chatgpt, connectors, foss, support">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c0b;
+      --panel: #0f1210;
+      --text: #d9e0d8;
+      --muted: #7f8c80;
+      --dim: #566057;
+      --accent: #9be564;
+      --accent-2: #f0a35e;
+      --line: #232a24;
+      --code: #c7d6c7;
+      --max: 780px;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: #c4ff9d; }
+    .wrap { width: min(calc(100% - 32px), var(--max)); margin: 0 auto; }
+    header { padding: 44px 0 30px; border-bottom: 1px solid var(--line); }
+    .prompt { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+    .prompt .host { color: var(--accent); }
+    .prompt .path { color: var(--accent-2); }
+    h1, h2 { line-height: 1.2; letter-spacing: -0.025em; }
+    h1 {
+      margin: 0;
+      max-width: 20ch;
+      font-size: clamp(2rem, 7vw, 3.6rem);
+      font-weight: 700;
+      color: #eef5ed;
+    }
+    .dek { margin: 22px 0 0; max-width: 65ch; color: var(--muted); font-size: 1.03rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 22px; color: var(--dim); font-size: 13px; }
+    main { padding: 32px 0 64px; }
+    h2 { margin: 3.2rem 0 1rem; font-size: 1.35rem; color: #e7eee6; }
+    h2::before { content: "## "; color: var(--accent); }
+    p { margin: 1rem 0; }
+    pre {
+      overflow-x: auto;
+      margin: 1.4rem 0;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--panel);
+      color: var(--code);
+      line-height: 1.45;
+      font-size: 14px;
+      tab-size: 2;
+    }
+    code { font-family: inherit; color: var(--code); }
+    p code { padding: 0.12rem 0.3rem; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); font-size: 0.94em; }
+    footer { padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    .cursor { display: inline-block; width: 0.65ch; height: 1.05em; margin-left: 0.2ch; vertical-align: -0.14em; background: var(--accent); animation: blink 1.15s steps(1, end) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } html { scroll-behavior: auto; } }
+    @media (max-width: 560px) { body { font-size: 15px; } header { padding-top: 28px; } pre { margin-left: -8px; margin-right: -8px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="prompt"><span class="host">void@localhost</span>:<span class="path">~/github-connector-suspension</span>$ cat incident.md</p>
+      <h1>ChatGPT's GitHub connector spazzed out and GitHub suspended me<span class="cursor" aria-hidden="true"></span></h1>
+      <p class="dek">GitHub suspended my account during a ChatGPT connector session, killed the connector OAuth tokens, and several FOSS projects I maintain went 404 for a while.</p>
+      <div class="meta">
+        <span>October 1, 2026</span>
+        <span>GitHub / ChatGPT connector</span>
+        <span>account suspension / OAuth</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p>September 29 I was using ChatGPT's GitHub connector to work on repos like I had been doing already.</p>
+
+    <p>Nothing especially exotic. Create stuff, edit stuff, have ChatGPT operate against GitHub through the connector.</p>
+
+    <p>Then GitHub suspended my account.</p>
+
+    <p>Not a repo. The whole account.</p>
+
+    <p>That meant several FOSS projects I maintain just started returning 404 for a while. Actions were gone too, so anything depending on GitHub Actions or Pages was broken along with it.</p>
+
+    <p>Pretty fucking annoying way to find out an integration has had a bad day.</p>
+
+    <h2>what i could actually see</h2>
+
+    <p>I pulled the GitHub audit data afterward because the initial explanation I got didn't line up very well with what I was seeing.</p>
+
+    <p>The useful timestamps were close together.</p>
+
+    <p>I had been doing repo work through ChatGPT.</p>
+
+    <p>At about 22:27 I connected/configured another repo through the GitHub integration.</p>
+
+    <p>At 23:03:29 GitHub logged:</p>
+
+<pre><code>user.suspend</code></pre>
+
+    <p>Then:</p>
+
+<pre><code>user.unsuspend</code></pre>
+
+    <p>GitHub also revoked the OAuth tokens belonging to the ChatGPT connector. More than once.</p>
+
+    <p>So something clearly happened around that integration session.</p>
+
+    <p>I can't prove from the audit log alone that ChatGPT caused the suspension. GitHub has internal abuse signals I don't get to see and OpenAI has connector logs I don't get to see.</p>
+
+    <p>But I also couldn't find the usual obvious "somebody stole my GitHub account" shit.</p>
+
+    <p>No mystery foreign login.</p>
+
+    <p>No SSH key I didn't recognize.</p>
+
+    <p>No weird OAuth app.</p>
+
+    <p>No obvious malicious pushes.</p>
+
+    <p>The activity I could see looked like my activity.</p>
+
+    <p>Which left me staring pretty hard at the connector activity immediately before GitHub's abuse system fired and then nuked the connector's OAuth authorization.</p>
+
+    <h2>github support</h2>
+
+    <p>GitHub support mostly seemed to think I was reporting some kind of account compromise or suspicious login.</p>
+
+    <p>I kept trying to explain that this didn't fit what I was seeing.</p>
+
+    <p>The audit log showed GitHub suspending the account right after a bunch of connector activity and then GitHub itself revoking the ChatGPT OAuth credentials.</p>
+
+    <p>At one point the conversation also seemed to be operating on the assumption that the ChatGPT GitHub integration couldn't really be doing write operations.</p>
+
+    <p>Except I had literally been using it to do write operations.</p>
+
+    <p>So that got weird fast.</p>
+
+    <p>I don't think I ever managed to get GitHub support onto the exact question I was asking (dont know why im surprised, its a microsoft product):</p>
+
+    <p>what caused the suspension at 23:03, and why were the ChatGPT connector credentials revoked at the same time?</p>
+
+    <p>Maybe they understood it internally and just couldn't tell me anything useful. Maybe the people answering didn't have access to whatever abuse system made the decision. I don't know.</p>
+
+    <p>From my side it kept feeling like I was reporting one incident and getting help for a slightly different one.</p>
+
+    <p>Meanwhile repos for several open source projects I maintain had been 404 because GitHub had suspended the account hosting them.</p>
+
+    <h2>openai support was weirdly good</h2>
+
+    <p>I contacted OpenAI too because obviously I wanted somebody on their side looking at the connector.</p>
+
+    <p>I was expecting this to be painful.</p>
+
+    <p>It really wasn't.</p>
+
+    <p>The automated support side couldn't inspect the connector telemetry I was asking about, which is reasonable. I wasn't asking how to click "Reconnect GitHub." I wanted somebody who could look at what the connector had actually been doing around the time GitHub suspended me.</p>
+
+    <p>It got escalated.</p>
+
+    <p>I was talking to a human in less than 12 hours.</p>
+
+    <p>And the human response actually seemed to understand the issue I was reporting.</p>
+
+    <p>I wasn't asking them to restore GitHub. OpenAI can't do that.</p>
+
+    <p>I wanted them to look at their side of the integration and figure out whether it had gone nuts, retried something a stupid number of times, generated some bizarre API pattern, or otherwise done something that GitHub might reasonably have interpreted as abuse.</p>
+
+    <p>I have complained about plenty of OpenAI shit before and probably will again, but support handled this one well.</p>
+
+    <p>GitHub was the company that owned the account that got suspended, and somehow OpenAI was the side where I felt like a human actually understood what I was asking.</p>
+
+    <p>That was not the outcome I expected.</p>
+
+    <h2>the connector is the interesting part</h2>
+
+    <p>This is why I'm writing this up instead of just chalking it up to "GitHub false positive, whatever."</p>
+
+    <p>These integrations have real write access.</p>
+
+    <p>They can create repos, edit files, push changes, and generally act on your behalf.</p>
+
+    <p>If one of them starts behaving strangely and trips an abuse system, the blast radius isn't limited to whatever repo you were working on.</p>
+
+    <p>In my case several unrelated public projects disappeared for a while because GitHub suspended the entire account.</p>
+
+    <p>That's kind of fucking nuts.</p>
+
+    <p>Maybe ChatGPT retried something too aggressively.</p>
+
+    <p>Maybe GitHub has an abuse heuristic that doesn't play nicely with AI agents doing bursts of API operations.</p>
+
+    <p>Maybe something else happened that neither company's user-facing logs expose.</p>
+
+    <p>I still don't know.</p>
+
+    <p>What I have is the timing, the suspension event, the OAuth revocations, and the fact that nothing else in the visible account activity looked like an obvious compromise.</p>
+
+    <p>That's where the evidence stops.</p>
+
+    <h2>after</h2>
+
+    <p>The account came back.</p>
+
+    <p>The ChatGPT authorization did not magically come back with it because GitHub had revoked it.</p>
+
+    <p>There were also account-level side effects afterward, including Actions/Pages being broken until the mess got sorted out.</p>
+
+    <p>For a while several FOSS repos I maintain were just gone from the public internet because of this.</p>
+
+    <p>That's the part I care about most.</p>
+
+    <p>These tools are starting to get enough access that when they screw up, they can screw up outside the thing you were actually asking them to touch.</p>
+
+    <p>I was trying to work on code.</p>
+
+    <p>Instead I got a GitHub suspension, dead OAuth tokens, broken Pages, and a support archaeology project.</p>
+
+    <p>OpenAI support, weirdly, was the least shitty part of the whole thing.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>void@localhost:~$ cd /dev/void &amp;&amp; </span><a href="https://devslashvoid.dev/">Enter /dev/void/</a><span> :: </span><span class="cursor" aria-hidden="true"></span>
+    </div>
+  </footer>
+</body>
+</html>
