@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>i built a fake industrial facility and made it operate itself</title>
+  <meta name="description" content="A simulated industrial facility operating a real production application's workflows through Playwright, with persistent defects, maintenance, and inventory.">
+  <meta name="theme-color" content="#0a0c0b">
+  <meta property="og:title" content="i built a fake industrial facility and made it operate itself">
+  <meta property="og:description" content="A simulated industrial facility operating a real production application's workflows through Playwright, with persistent defects, maintenance, and inventory.">
+  <meta property="og:type" content="article">
+  <meta name="devvoid:post" content="1">
+  <meta name="devvoid:title" content="i built a fake industrial facility and made it operate itself">
+  <meta name="devvoid:summary" content="A simulated industrial facility operating a real production application's workflows through Playwright, with persistent defects, maintenance, and inventory.">
+  <meta name="devvoid:published" content="2026-10-21T00:52:00Z">
+  <meta name="devvoid:tags" content="automation, simulation, playwright, software-testing, sqlite, industrial-software">
+  <style>
+:root{color-scheme:dark;--bg:#0a0c0b;--panel:#0f1210;--text:#d9e0d8;--muted:#7f8c80;--dim:#566057;--accent:#9be564;--accent-2:#f0a35e;--line:#232a24;--code:#c7d6c7;--max:780px}
+*{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:16px;line-height:1.72;text-rendering:optimizeLegibility}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}a:hover{color:#c4ff9d}
+.wrap{width:min(calc(100% - 32px),var(--max));margin:0 auto}header{padding:44px 0 30px;border-bottom:1px solid var(--line)}
+.prompt{margin:0 0 18px;color:var(--muted);font-size:13px}.prompt .host{color:var(--accent)}.prompt .path{color:var(--accent-2)}
+h1,h2{line-height:1.2;letter-spacing:-.025em}h1{margin:0;max-width:20ch;font-size:clamp(2rem,7vw,3.6rem);font-weight:700;color:#eef5ed}
+.dek{margin:22px 0 0;max-width:65ch;color:var(--muted);font-size:1.03rem}.meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;color:var(--dim);font-size:13px}
+main{padding:32px 0 64px}h2{margin:3.2rem 0 1rem;font-size:1.35rem;color:#e7eee6}h2::before{content:"## ";color:var(--accent)}
+p{margin:1rem 0}code{font-family:inherit;color:var(--code)}p code{padding:.12rem .3rem;border:1px solid var(--line);border-radius:3px;background:var(--panel);font-size:.94em}
+footer{padding:24px 0 48px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+.cursor{display:inline-block;width:.65ch;height:1.05em;margin-left:.2ch;vertical-align:-.14em;background:var(--accent);animation:blink 1.15s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}@media(prefers-reduced-motion:reduce){.cursor{animation:none}html{scroll-behavior:auto}}
+@media(max-width:560px){body{font-size:15px}header{padding-top:28px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="prompt"><span class="host">void@localhost</span>:<span class="path">~/simulation</span>$ cat README.md</p>
+      <h1>i built a fake industrial facility and made it operate itself<span class="cursor" aria-hidden="true"></span></h1>
+      <div class="meta"><span>October 20, 2026</span><span>simulation / automation</span><span>production testing</span></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <p>i've been working on a simulator for an industrial operations and compliance platform.</p>
+
+    <p>The application handles inspections, equipment maintenance, discrepancies, work orders, inventory, and a bunch of related operational paperwork.</p>
+
+    <p>The simulator operates a fake facility inside the actual production application. It has equipment, employees, maintenance problems, inspections that need doing, and other things that would normally require people to log in and do their jobs.</p>
+
+    <p>Except there aren't any people.</p>
+
+    <p>It's running in production now, against an isolated synthetic facility, on a schedule. The records are fake. The application and its workflows are real.</p>
+
+    <p>I put most of this together in my spare time over a few long sessions. It's been getting incremental improvements since, but the core system was built in a surprisingly small number of sittings.</p>
+
+    <h2>why i wanted this thing</h2>
+
+    <p>Testing a system like this is annoying because everything is connected to something else.</p>
+
+    <p>An inspection creates a discrepancy. A discrepancy can take equipment out of service. Somebody has to repair it, possibly consume inventory, close a work order and return the equipment to service. Meanwhile there are compliance periods ticking away, reports being generated, and more inspections becoming due.</p>
+
+    <p>You can test each piece individually. We already do plenty of that.</p>
+
+    <p>But a pile of unit tests doesn't necessarily tell you what happens when the system has been running for months, users have been doing things in different orders, and somebody goes back and changes a record from three weeks ago.</p>
+
+    <p>And manually maintaining a test environment full of believable operational history is tedious as shit.</p>
+
+    <p>So the idea was to build something that would operate the application the way an actual facility might be operated, and keep doing it.</p>
+
+    <p>Not just fill a database with random crap.</p>
+
+    <h2>it has to use the actual application</h2>
+
+    <p>The simulator uses Node.js and Playwright to interact with the application's frontend.</p>
+
+    <p>It authenticates with dedicated test accounts using the normal login process. Different accounts have different roles, and those roles have different jobs and permissions.</p>
+
+    <p>The simulator discovers work from the same screens a human would use. If something isn't available to that user, or the application won't allow an action, the simulator doesn't get to override that decision.</p>
+
+    <p>I could have made the whole thing substantially faster by having it write directly into MySQL or call private application methods.</p>
+
+    <p>That would also defeat a good portion of the reason it exists.</p>
+
+    <p>I want to know whether the application actually works, including the ridiculous chain of frontend code, backend validation, permissions, saves, and state changes between clicking something and having it show up correctly afterward.</p>
+
+    <p>A successful button click isn't enough. The simulator goes back and verifies what the application actually recorded.</p>
+
+    <h2>the equipment needs a memory</h2>
+
+    <p>This was probably the more interesting part of the project.</p>
+
+    <p>If a simulated piece of equipment has a damaged component, that component needs to remain damaged tomorrow.</p>
+
+    <p>It can't suddenly become fine because the script started over.</p>
+
+    <p>The simulator maintains its own synthetic physical world in SQLite, separate from the application's database. It tracks equipment characteristics, readings, usage, defects, repair state, and other information that needs to survive between runs.</p>
+
+    <p>The application knows which inspections are due and what the official workflow state is.</p>
+
+    <p>The simulator knows what condition the imaginary equipment is in.</p>
+
+    <p>Those are two different things.</p>
+
+    <p>For example, a piece of equipment might gradually develop an abnormal measurement as it accumulates operating hours. Eventually that reading becomes a discrepancy. The inspection records it, and the problem remains until the simulated repair actually happens.</p>
+
+    <p>A maintenance worker then has to go through the appropriate work-order or return-to-service workflow. The equipment doesn't get magically repaired because some function returned successfully.</p>
+
+    <p>I actually managed to screw this up during development.</p>
+
+    <p>The return-to-service code was using the same answer-selection path as an active discrepancy. So after repairing something, the simulator could answer the repaired check with another failing value and reopen the damn problem it had just fixed.</p>
+
+    <p>That needed a separate clean-pass path, proper readings, and verification that the discrepancy and any associated work order were actually closed.</p>
+
+    <h2>making it behave less like a test script</h2>
+
+    <p>A simulator that completes every inspection perfectly, every day, is not particularly useful.</p>
+
+    <p>Real facilities have idle equipment, missed inspections, delayed maintenance, and things that break at inconvenient times.</p>
+
+    <p>The simulator makes these decisions using a configurable realism model.</p>
+
+    <p>Some equipment gets used more than other equipment. Some inspections are completed, others are marked as not used, and some are deliberately missed. Safety observations and preventive maintenance have their own workflows. Critical defects can take equipment out of service.</p>
+
+    <p>Missed inspections are especially useful because the application has its own compliance logic. The simulator doesn't just insert a noncompliance record to make a test pass. It leaves eligible work undone and lets the application's normal process determine whether a compliance finding should exist.</p>
+
+    <p>It also knows about existing findings and can run their explanation workflow.</p>
+
+    <p>Defects have their own persistent lifecycle. Some require parts, some can be closed directly, and some repairs take longer than others.</p>
+
+    <p>The parts aren't just random inventory entries either. The simulator attempts to select something related to the actual problem. A repair that needs a part shouldn't consume whatever happened to be first in a database query.</p>
+
+    <p>I also added a material-flow model.</p>
+
+    <p>Inventory has to come from somewhere and go somewhere. Receipts, transfers, replenishment, and consumption are represented as movements in a ledger. The quantities have to balance, and an unconfirmed browser action doesn't get to move material merely because the simulator intended it to happen.</p>
+
+    <p>If the process dies halfway through creating a transaction, that needs to be reconciled against the application's records before trying again. Otherwise you've built a machine for duplicating imaginary inventory.</p>
+
+    <p>Which would be funny, but not particularly helpful for testing accounting.</p>
+
+    <h2>the browser was its own problem</h2>
+
+    <p>One of the earlier approaches involved discovering the available inspections, loading all their check data, and then processing them.</p>
+
+    <p>This could mean dragging around roughly 180 inspections' worth of check context before the simulator actually completed anything.</p>
+
+    <p>It also hammered a single browser page with repeated navigation, which appears to have contributed to a hang during a live run.</p>
+
+    <p>So that went away.</p>
+
+    <p>Now it discovers the work, takes an item, loads what it needs, performs it, verifies the result, persists the state, and moves to the next one.</p>
+
+    <p>Individual inspections can also be surprisingly slow. Some of the larger maintenance wizards have multiple pages, interconnected equipment, and a considerable amount of application-side processing.</p>
+
+    <p>You can't just put a 30-second timeout on everything and call it broken when one of these takes longer.</p>
+
+    <p>The runner has bounded retries for transient problems, page recovery, and separate handling for actual validation failures. A legitimate rejection from the application isn't something to keep retrying until it magically becomes valid.</p>
+
+    <h2>the AI part, or lack thereof at runtime</h2>
+
+    <p>I used coding agents heavily while building the simulator. The operational skills are documented in <code>SKILL.md</code> files, organized around the roles and workflows they apply to.</p>
+
+    <p>The original architecture also leaves room for swapping in a language-model-driven agent runtime.</p>
+
+    <p>But the production runner currently uses a local adapter with deterministic application logic.</p>
+
+    <p>There isn't an LLM sitting there every time cron fires, improvising its way through a bunch of inspection questions.</p>
+
+    <p>The local adapter knows how to operate the supported browser workflows, and the skills document their behavior. It can't interpret arbitrary skill prose and invent a new workflow it hasn't been programmed to handle.</p>
+
+    <p>That's intentional for now. Having something decide that an inspection probably succeeded because the screen looked vaguely correct would be a pretty stupid way to test compliance software.</p>
+
+    <p>The AI was useful for developing the thing, researching the application behavior, and generating and correcting code. The running simulator needs predictable behavior and observable failures.</p>
+
+    <h2>production, but not real operations</h2>
+
+    <p>The simulator runs against a dedicated synthetic environment in the application's normal production deployment.</p>
+
+    <p>It uses its own accounts and equipment. None of this is supposed to touch actual customer operations.</p>
+
+    <p>The code lives on a separate Git branch rather than being merged into the application's main branch. The scheduled job pulls that branch and runs the simulator directly.</p>
+
+    <p>It doesn't need to be part of the web application's release to do its job.</p>
+
+    <p>Cron starts a run, the simulator works through the appropriate operational activities, records what happened, and exits. Subsequent runs pick up the persistent state.</p>
+
+    <p>There are safeguards against overlapping runs and accidentally repeating completed work. The operational date follows the configured timezone, which is another detail that gets ugly around midnight and daylight saving time.</p>
+
+    <p>The simulator also records work it couldn't perform. An unsupported inspection, missing permissions, a failed save, or an uncertain inventory transaction shouldn't disappear into a cheerful success summary.</p>
+
+    <h2>now it just keeps running</h2>
+
+    <p>The core project is finished and deployed. I'm still working on it, mostly improving how realistically the facility behaves and dealing with the weird cases that only appear when you keep exercising a large application.</p>
+
+    <p>The initial implementation came together over a handful of long sessions outside my normal work. What takes more time now is tuning the behavior, finding the edge cases, and dealing with everything the application does that nobody thought to account for.</p>
+
+    <p>The more of the normal application it operates, the more likely it is to encounter the same strange state combinations that real users eventually produce.</p>
+
+    <p>It isn't a replacement for unit tests or human QA. It's another way of keeping the software under load, with persistent state and actual workflows instead of completely isolated test cases.</p>
+
+    <p>And I don't have to sit there doing the same inspections every morning just to keep the test environment alive.</p>
+
+    <p>The imaginary employees can deal with that.</p>
+  </main>
+  <footer><div class="wrap">void@localhost:~$ cd /dev/void &amp;&amp; <a href="https://devslashvoid.dev/">Enter /dev/void/</a><span class="cursor" aria-hidden="true"></span></div></footer>
+</body>
+</html>
