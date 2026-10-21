@@ -397,8 +397,7 @@ def build_rss(posts):
     ET.SubElement(channel, "title").text = "Enter /dev/void/"
     ET.SubElement(channel, "link").text = SITE_URL
     ET.SubElement(channel, "description").text = (
-        "Old hardware, embedded Linux, reverse engineering, local services, "
-        "and other things I decided to screw with."
+        "Software, Systems, Automation & Reverse Engineering"
     )
     ET.SubElement(channel, "language").text = "en-us"
     ET.SubElement(channel, "generator").text = "Enter /dev/void/ metadata indexer"
