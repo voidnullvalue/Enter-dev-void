@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I Rooted a 5G Hotspot and Now It Runs My House · Enter /dev/void/</title>
+<meta name="description" content="An Inseego MiFi M2000 runs my local MQTT home automation setup, custom C gateway, and the Bloodsucker Android app.">
+<meta name="theme-color" content="#0a0c0b">
+<meta property="og:title" content="I Rooted a 5G Hotspot and Now It Runs My House"><meta property="og:description" content="Rooted M2000, Mosquitto, local device protocols, a C gateway, and an Android client called Bloodsucker."><meta property="og:type" content="article">
+<meta name="devvoid:post" content="1"><meta name="devvoid:title" content="I Rooted a 5G Hotspot and Now It Runs My House">
+<meta name="devvoid:summary" content="I repurposed an Inseego MiFi M2000 into my local MQTT home automation server, wrote a C gateway for the devices, and built the Bloodsucker Android companion app.">
+<meta name="devvoid:published" content="2026-10-22T18:41:00Z">
+<meta name="devvoid:tags" content="mifi, m2000, embedded-linux, mqtt, home-automation, reverse-engineering, bloodsucker, android">
+<style>
+:root{color-scheme:dark;--bg:#0a0c0b;--text:#d9e0d8;--muted:#7f8c80;--accent:#9be564;--accent-2:#f0a35e;--line:#232a24}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.72 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+a{color:var(--accent)}a:hover{color:#c4ff9d}.wrap{width:min(calc(100% - 32px),780px);margin:auto}
+header{padding:44px 0 30px;border-bottom:1px solid var(--line)}
+.prompt,.meta,footer{font-size:13px;color:var(--muted)}.prompt .host{color:var(--accent)}.prompt .path{color:var(--accent-2)}
+h1,h2{line-height:1.2;letter-spacing:-.025em}h1{font-size:clamp(2rem,7vw,3.6rem);margin:0;max-width:20ch;color:#eef5ed}
+.dek{margin:22px 0 0;color:var(--muted)}.meta{margin-top:20px}main{padding:32px 0 64px}h2{margin:3rem 0 1rem;font-size:1.35rem;color:#e7eee6}
+h2:before{content:"## ";color:var(--accent)}p{margin:1rem 0}code{color:#c7d6c7}
+pre{background:#0f1210;border:1px solid var(--line);padding:15px;overflow:auto;line-height:1.45}
+footer{padding:24px 0 48px;border-top:1px solid var(--line)}.cursor{display:inline-block;width:.65ch;height:1.05em;margin-left:.2ch;vertical-align:-.14em;background:var(--accent);animation:blink 1.15s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}@media(prefers-reduced-motion:reduce){.cursor{animation:none}}@media(max-width:560px){body{font-size:15px};header{padding-top:28px}}
+</style></head><body>
+<header><div class="wrap"><p class="prompt"><span class="host">void@mifi</span>:<span class="path">~/mqtt-gateway</span>$ cat BLOG.md</p>
+<h1>I Rooted a 5G Hotspot and Now It Runs My House<span class="cursor" aria-hidden="true"></span></h1>
+<p class="dek">An Inseego MiFi M2000, Mosquitto, a custom C gateway, and an Android app called Bloodsucker. Apparently this is home automation now.</p>
+<div class="meta"><span>October 22, 2026</span> · <span>embedded Linux / MQTT / home automation</span></div></div></header>
+<main class="wrap"><p>I've got an Inseego MiFi M2000 that's currently doing something it was never intended to do. It's running my home automation setup.</p>
+    <p>The M2000 is a 5G mobile hotspot. Normally you turn it on, connect a few devices to its Wi-Fi, and use it for internet access. Mine runs an MQTT broker, a custom C daemon, a web interface, and a bunch of automation services. I also wrote an Android app to control everything.</p>
+    <p>I didn't discover some exciting new exploit to make this happen. The entry point was already known. I just wanted root access to the thing, and once I had it, there wasn't much reason to stop there.</p>
+    <h2>getting into the MiFi</h2>
+    <p>The M2000 runs embedded Linux, although Inseego would rather you interact with it through their web interface and leave the rest alone.</p>
+    <p>The useful entry point was its OpenVPN configuration functionality. The web interface accepts uploaded VPN profiles, and the underlying processing path can be abused to execute commands through OpenVPN's script functionality.</p>
+    <p>My <code>m2000_rce.py</code> script handles authentication, builds a configuration containing the command I want to execute, and submits it through the VPN interface.</p>
+    <p>The vulnerability itself isn't my research, and I'm not claiming otherwise. I was interested in what I could do with the access.</p>
+    <p>Once I had command execution, I started making the changes persistent. That meant modifying the startup environment, enabling ADB access, and adding boot hooks for my own services. I also disabled the firmware update clients because having the vendor replace my modified environment with an update would be rather inconvenient.</p>
+    <p>Some of the work was just getting the thing to behave like a normal Linux machine. The M2000 has its own ideas about networking and startup order, and those ideas don't necessarily agree with running services unrelated to being a hotspot.</p>
+    <p>I eventually had it joining my regular LAN and starting my own processes on boot.</p>
+    <h2>putting Mosquitto to work</h2>
+    <p>The device already had Mosquitto utilities available, which was convenient because I wanted MQTT to be the common interface for everything.</p>
+    <p>I don't particularly like making every smart device depend on a manufacturer's cloud service. If I have a light or a smart plug sitting three feet away from me, I shouldn't need somebody else's server to tell it to turn on.</p>
+    <p>The Meross plugs were one of the more annoying parts.</p>
+    <p>Pointing them at a local broker wasn't sufficient. They could establish an MQTT connection and still not actually behave as usable devices.</p>
+    <p>Turns out there's a binding process involved. The devices expect specific messages and acknowledgments before they'll accept the connection as properly established. Meross also signs its messages, so there was some protocol work involved beyond publishing <code>ON</code> to a topic and hoping for the best.</p>
+    <p>I ended up writing <code>bind-plug.sh</code> to handle the binding process and a local switch interface to send properly formed commands.</p>
+    <p>The end result is that I can control the plugs locally without asking Meross for permission every time.</p>
+    <p>I kept the vendor-specific handling on the MiFi rather than spreading that logic across every client that might want to control a switch.</p>
+    <h2>the gateway got a little out of hand</h2>
+    <p>Once the broker was handling plugs, I wanted a way to see everything connected to it.</p>
+    <p>I could have installed a conventional home automation stack on another computer. I already had working MQTT infrastructure, though, and the MiFi was sitting there running Linux. Adding an entire separate machine just to put a few controls on a screen seemed unnecessary.</p>
+    <p>So I wrote <code>mqtt-gateway</code>.</p>
+    <p>It's a C daemon compiled as a static ARMv7 musl executable. It uses the existing <code>mosquitto_sub</code> and <code>mosquitto_pub</code> programs for transport, maintains an inventory of observed MQTT topics, and exposes a small HTTP server.</p>
+    <p>The basic arrangement is:</p>
+    <pre><code>MQTT devices
+     |
+     v
+ Mosquitto
+     |
+     +---- mqtt-gateway
+     |         |
+     |         +---- topic discovery
+     |         +---- device state
+     |         +---- HTTP dashboard
+     |         +---- validated controls
+     |
+     +---- other MQTT clients</code></pre>
+    <p>The gateway subscribes to traffic, recognizes topic patterns it understands, and groups related messages into devices.</p>
+    <p>For example, something publishing under:</p>
+    <pre><code>device/switch/entity/state</code></pre>
+    <p>can be associated with its corresponding command topic, provided it follows the expected convention.</p>
+    <p>I deliberately didn't make every discovered topic writable. Seeing a message on MQTT doesn't establish what commands the device supports, and randomly publishing to unfamiliar topics is a good way to make things do stupid shit.</p>
+    <p>Unknown devices can still appear in the topic inventory without the gateway pretending it knows how to control them.</p>
+    <p>The web interface grew support for WLED lighting, ESPHome devices, Govee Bluetooth sensors, weather data, Wake-on-LAN, and Matter devices.</p>
+    <p>WLED was fairly straightforward because its MQTT interface already exposes useful state and control topics. The gateway can handle brightness, colors, effects, palettes, presets, and transitions. It also fetches effect and palette names from the devices so I don't have to remember which arbitrary number corresponds to which lighting effect.</p>
+    <p>The Bluetooth sensors took a little more work.</p>
+    <p>My Govee H5075 and H5179 sensors publish advertisements through MQTT-connected BLE scanners. The temperature, humidity, and battery readings are packed into manufacturer-specific data, so the gateway has to decode that rather than expecting a nice JSON field called <code>temperature</code>.</p>
+    <p>It also has to deduplicate devices. If several scanners hear the same thermometer, I don't need three thermometers appearing in the dashboard.</p>
+    <p>There's support for Govee motion advertisements too.</p>
+    <p>The Matter side currently includes a Govee H7126 air purifier. Its state comes through MQTT as Matter cluster and attribute values, which the gateway converts into something a human might actually want to see. Power, fan percentage, air quality, and filter condition are useful. A screen full of cluster IDs isn't.</p>
+    <p>The purifier only exposes a categorical air-quality value through the data I'm getting. It doesn't provide numeric particulate concentration, so I'm not going to invent one.</p>
+    <p>I also added weather, a few display controls, and assorted other things that were already publishing MQTT messages around the house.</p>
+    <p>At this point the thing was becoming a reasonably useful home automation controller.</p>
+    <h2>keeping the little bastard running</h2>
+    <p>There's a difference between getting an ARM binary to execute once and making it survive unattended on a consumer hotspot.</p>
+    <p>The gateway needs the MiFi's LAN interface to have an address before its HTTP server can bind. The launcher waits for that rather than assuming the network is ready as soon as the boot script runs.</p>
+    <p>It also supervises the process and starts it again if it dies.</p>
+    <p>State is stored in compact TSV files. The gateway maintains a registry of up to 1024 observed topics, along with saved names and classifications. It batches writes instead of hammering the flash every time a sensor publishes something.</p>
+    <p>That matters when you're running on embedded storage that wasn't intended to serve as a general-purpose database.</p>
+    <p>I also had to deal with the web interface itself. There's no reason to render a thousand raw MQTT topics every time the page refreshes, so the routine dashboard stays relatively small and the full inventory is only rendered when requested.</p>
+    <p>A browser disconnect shouldn't kill the daemon either. It ignores <code>SIGPIPE</code> rather than letting an aborted HTTP connection take down the whole process.</p>
+    <p>None of this is especially glamorous. It's mostly making sure the services don't fall over because the network wasn't ready or somebody closed a browser tab.</p>
+    <h2>Bloodsucker</h2>
+    <p>The web dashboard worked, but I wanted a proper Android interface.</p>
+    <p>So I made <a href="https://github.com/voidnullvalue/Bloodsucker">Bloodsucker</a>.</p>
+    <p>Yes, it's a Mosquitto joke. I'm aware.</p>
+    <p>Bloodsucker is a native Kotlin/Jetpack Compose app using Material 3. It connects directly to the MQTT broker and discovers devices from their messages rather than requiring me to manually define every switch, light, and sensor in the app.</p>
+    <p>It supports the WLED lights, locally bridged switches, Govee BLE sensors, weather data, Matter devices, the gateway's own switches, and Wake-on-LAN.</p>
+    <p>The important bit is that it talks to MQTT directly.</p>
+    <p>The gateway handles the ugly protocol translation where necessary. Bloodsucker doesn't need to know how Meross signs its messages or how its binding process works. It can publish a command to one of the gateway's normalized topics and let the MiFi deal with the device.</p>
+    <p>For WLED and other devices with useful native MQTT interfaces, the app can talk to those topics directly.</p>
+    <p>I wanted something that behaved like an actual smart-home app, not an MQTT debugger with some buttons bolted onto it.</p>
+    <p>Devices are discovered automatically, and the app stores aliases, rooms, favorites, and its own installation identity locally. It also rebuilds its state from retained MQTT messages when it reconnects.</p>
+    <p>That last part is useful because I don't need a constantly running Android background service just to remember whether a light was on when I last opened the app. MQTT already has a mechanism for retaining state.</p>
+    <p>Bloodsucker currently connects while the app process is alive. It's not intended to be an always-running notification or monitoring service.</p>
+    <p>The repository is GPLv3, so anybody who wants to adapt it can fork it. It's also pretty opinionated about how my house works, which is why I describe it as a reference implementation rather than pretending it's a general-purpose product.</p>
+    <p>I'm not interested in building another enormous smart-home framework.</p>
+    <h2>why not just use Home Assistant?</h2>
+    <p>Because I didn't want to.</p>
+    <p>That's probably not a satisfying technical explanation, but it is part of the reason.</p>
+    <p>Home Assistant can handle most of the equipment involved here, and I'm not claiming this setup replaces its capabilities. There's plenty of functionality in HA that I haven't implemented and have no intention of implementing.</p>
+    <p>I wanted the local MQTT broker to be the common interface, with devices and small services publishing useful state and accepting explicit commands.</p>
+    <p>I also wanted control over what the system actually does without maintaining another large application and its dependencies.</p>
+    <p>The MiFi already had Linux, networking, and enough room to run a small service. Writing a compact gateway around the things I actually use was a reasonable tradeoff for me.</p>
+    <p>It certainly isn't the easiest route if your objective is to turn on a light.</p>
+    <p>But I already own the hardware, and screwing with this sort of thing is half the point.</p>
+    <h2>some obvious problems</h2>
+    <p>This is still a rooted consumer hotspot running software it was never designed to run.</p>
+    <p>The firmware is proprietary and unsupported for this purpose. I've modified startup behavior and disabled update mechanisms. That gives me control, but it also means maintenance and security are now my problem.</p>
+    <p>The MQTT broker currently allows anonymous connections on the local network. The gateway also exposes local HTTP controls without application-level authentication.</p>
+    <p>I keep those services confined to my LAN and block cellular-facing access, but that's not the same thing as having proper authentication. If I were deploying this on an untrusted network, I'd want broker credentials, TLS, and authenticated control endpoints.</p>
+    <p>There's also the obvious issue of depending on one aging piece of hardware. If the M2000 dies, the services running on it die too.</p>
+    <p>And while the gateway's storage writes are deliberately limited, that doesn't magically turn the flash into enterprise-grade storage.</p>
+    <p>I haven't done a proper power consumption comparison against a Raspberry Pi or other small Linux machine, so I'm not claiming this is the most efficient way to run the setup.</p>
+    <p>It's the hardware I already had, and it does the job.</p>
+    <h2>so now a hotspot runs my house</h2>
+    <p>The funny part is that the root exploit was probably the least interesting piece of the whole project.</p>
+    <p>The more involved work was getting the various devices talking locally, dealing with their different protocols, writing a daemon that could recognize and control them, and getting the whole thing to survive reboots without intervention.</p>
+    <p>I didn't really set out to build a home automation platform on a MiFi. I got access to a Linux machine that wasn't supposed to be a Linux machine I could use, found it had enough resources to do something useful, and kept adding things.</p>
+    <p>Now there's an Android app called Bloodsucker talking to Mosquitto on a rooted 5G hotspot, which in turn controls a bunch of equipment around my house.</p>
+    <p>It's a fairly ridiculous arrangement.</p>
+    <p>I like it.</p></main>
+<footer><div class="wrap">void@mifi:~$ cd /dev/void &amp;&amp; <a href="https://devslashvoid.dev/">Enter /dev/void/</a> :: <a href="https://github.com/voidnullvalue/Bloodsucker">Bloodsucker source</a> <span class="cursor" aria-hidden="true"></span></div></footer>
+</body></html>
